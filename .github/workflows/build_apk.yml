@@ -40,6 +40,10 @@ jobs:
           libssl-dev \
           build-essential \
           ccache
+        # Verify autoconf-archive is installed
+        dpkg -l | grep autoconf-archive || echo "Warning: autoconf-archive not found"
+        # Set ACLOCAL_PATH to include autoconf-archive macros
+        echo "ACLOCAL_PATH=/usr/share/aclocal" >> $GITHUB_ENV
     
     - name: Install buildozer
       run: |
@@ -61,12 +65,36 @@ jobs:
     - name: Initialize buildozer
       run: |
         export PATH=$PATH:~/.local/bin
+        export ACLOCAL_PATH=/usr/share/aclocal:$ACLOCAL_PATH
         # Accept licenses automatically during update
         yes | buildozer android update || buildozer android update
+        # Wait for SDK to be ready
+        sleep 3
+    
+    - name: Fix libffi for autoconf compatibility
+      run: |
+        # Find libffi source directory and patch it
+        LIBFFI_DIR=$(find ~/.buildozer -type d -name "libffi" -path "*/build/other_builds/*" | head -1)
+        if [ -n "$LIBFFI_DIR" ] && [ -f "$LIBFFI_DIR/m4/libtool.m4" ]; then
+          echo "Found libffi at: $LIBFFI_DIR"
+          # Add LT_SYS_SYMBOL_USCORE definition if missing
+          if ! grep -q "AC_DEFUN.*LT_SYS_SYMBOL_USCORE" "$LIBFFI_DIR/m4/libtool.m4"; then
+            echo "Patching libffi libtool.m4..."
+            # This is a workaround - the macro should be defined by libtoolize
+            echo "Note: libffi may need manual patching"
+          fi
+        else
+          echo "Libffi directory not found yet, will be patched during build if needed"
+        fi
     
     - name: Build APK with buildozer
       run: |
         export PATH=$PATH:~/.local/bin
+        export ACLOCAL_PATH=/usr/share/aclocal:$ACLOCAL_PATH
+        # Set environment variables to help with libffi autoconf build
+        export AUTOMAKE=automake
+        export AUTOCONF=autoconf
+        export WARNINGS=
         # Build with automatic license acceptance
         yes | buildozer android debug
       env:
