@@ -1,0 +1,42 @@
+==========================================
+HelloSms - How to Build APK
+==========================================
+
+EASIEST METHOD: GitHub Actions (No installation needed!)
+
+STEPS:
+
+1. CREATE GITHUB ACCOUNT
+   - Go to: https://github.com
+   - Sign up (free)
+
+2. CREATE REPOSITORY
+   - Click "New repository"
+   - Name: HelloSms
+   - IMPORTANT: Make it PUBLIC
+   - Click "Create repository"
+
+3. UPLOAD FILES
+   - Click "uploading an existing file"
+   - Drag ALL files from HelloSms folder
+   - Make sure .github folder is included!
+   - Click "Commit changes"
+
+4. BUILD APK
+   - Go to "Actions" tab
+   - Click "Build APK with Buildozer"
+   - Click "Run workflow"
+   - Wait 15-30 minutes
+
+5. DOWNLOAD APK
+   - Go to "Actions" tab
+   - Click completed workflow
+   - Download "hellosms-apk-android11" from Artifacts
+   - Extract ZIP to get APK
+
+APK will work on Android 11+ devices!
+
+==========================================
+OR: Run BUILD_APK.bat for step-by-step guide
+==========================================
+

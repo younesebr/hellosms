@@ -1,0 +1,7 @@
+kivy>=2.2.0
+plyer
+pyjnius
+arabic-reshaper
+python-bidi
+# android - فقط در محیط اندروید در دسترس است (از طریق python-for-android)
+
