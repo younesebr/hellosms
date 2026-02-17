@@ -30,6 +30,8 @@ jobs:
           openjdk-17-jdk \
           python3-pip \
           autoconf \
+          autoconf-archive \
+          automake \
           libtool \
           pkg-config \
           zlib1g-dev \
@@ -61,8 +63,6 @@ jobs:
         export PATH=$PATH:~/.local/bin
         # Accept licenses automatically during update
         yes | buildozer android update || buildozer android update
-        # Wait a bit for SDK to be ready
-        sleep 5
     
     - name: Build APK with buildozer
       run: |
