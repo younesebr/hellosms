@@ -51,7 +51,6 @@ jobs:
           libreadline-dev \
           libncursesw5-dev \
           uuid-dev \
-          libffi6 \
           ffmpeg \
           libsdl2-dev \
           libsdl2-image-dev \
