@@ -29,6 +29,8 @@ jobs:
           unzip \
           openjdk-17-jdk \
           python3-pip \
+          python3-dev \
+          build-essential \
           autoconf \
           autoconf-archive \
           automake \
@@ -38,22 +40,40 @@ jobs:
           cmake \
           libffi-dev \
           libssl-dev \
-          build-essential \
+          openssl \
+          libsqlite3-dev \
+          sqlite3 \
+          bzip2 \
+          libbz2-dev \
+          libgdbm-dev \
+          libgdbm-compat-dev \
+          liblzma-dev \
+          libreadline-dev \
+          libncursesw5-dev \
+          uuid-dev \
+          libffi6 \
+          ffmpeg \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-mixer-dev \
+          libsdl2-ttf-dev \
+          libportmidi-dev \
+          libswscale-dev \
+          libavformat-dev \
+          libavcodec-dev \
+          libgstreamer1.0 \
+          gstreamer1.0-plugins-base \
+          gstreamer1.0-plugins-good \
           ccache
-        # Verify autoconf-archive is installed
-        dpkg -l | grep autoconf-archive || echo "Warning: autoconf-archive not found"
-        # Set ACLOCAL_PATH to include autoconf-archive macros
         echo "ACLOCAL_PATH=/usr/share/aclocal" >> $GITHUB_ENV
     
     - name: Install buildozer
       run: |
-        pip3 install --user buildozer cython
+        pip3 install --user buildozer cython==0.29.19
     
     - name: Accept Android licenses
       run: |
-        # Create licenses directory
         mkdir -p ~/.android/licenses
-        # Accept all Android SDK licenses
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/licenses/android-sdk-license
         echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
         echo "d975f751698a77b662f1254ddbeed3901e976f5a" > ~/.android/licenses/android-sdk-license
@@ -66,45 +86,9 @@ jobs:
       run: |
         export PATH=$PATH:~/.local/bin
         export ACLOCAL_PATH=/usr/share/aclocal:$ACLOCAL_PATH
-        # Accept licenses automatically during update
         yes | buildozer android update || buildozer android update
-        # Wait for SDK to be ready
         sleep 3
     
-    - name: Patch libffi recipe (pre-build)
-      run: |
-        # Find python-for-android directory
-        P4A_DIR=$(find ~/.buildozer -type d -name "python-for-android" | head -1)
-        if [ -z "$P4A_DIR" ]; then
-          # Try to find it in buildozer cache
-          P4A_DIR=$(python3 -c "import buildozer; import os; print(os.path.join(os.path.expanduser('~'), '.buildozer', 'android', 'platform', 'python-for-android'))" 2>/dev/null || echo "")
-        fi
-        
-        if [ -n "$P4A_DIR" ] && [ -d "$P4A_DIR" ]; then
-          echo "Found python-for-android at: $P4A_DIR"
-          # Create a patch script that will be used during libffi build
-          mkdir -p /tmp/libffi_patch
-          cat > /tmp/libffi_patch/patch.sh << 'EOFPATCH'
-          #!/bin/bash
-          # Patch libffi configure.ac to fix LT_SYS_SYMBOL_USCORE
-          LIBFFI_SRC="$1"
-          if [ -f "$LIBFFI_SRC/configure.ac" ]; then
-            # Check if already patched
-            if ! grep -q "m4_ifndef.*LT_SYS_SYMBOL_USCORE" "$LIBFFI_SRC/configure.ac"; then
-              # Add the macro definition after AC_INIT
-              sed -i '/^AC_INIT/a\
-          # Workaround for autoconf 2.71+: define LT_SYS_SYMBOL_USCORE if not defined\
-          m4_ifndef([LT_SYS_SYMBOL_USCORE], [m4_define([LT_SYS_SYMBOL_USCORE], [m4_if([$host_os], [cygwin* | mingw* | pw32* | os2*], [1], [0])])])' "$LIBFFI_SRC/configure.ac"
-              echo "Patched libffi configure.ac"
-            fi
-          fi
-          EOFPATCH
-          chmod +x /tmp/libffi_patch/patch.sh
-          echo "Created libffi patch script"
-        else
-          echo "python-for-android not found yet, will patch during build"
-        fi
-
     - name: Build APK with buildozer
       run: |
         export PATH=$PATH:~/.local/bin
@@ -113,90 +97,26 @@ jobs:
         export AUTOCONF=autoconf
         export WARNINGS=
         
-        # Create Python script to patch libffi
-        cat > /tmp/patch_libffi.py << 'EOFPY'
-import re
-import sys
-
-def patch_libffi(configure_ac_path):
-    with open(configure_ac_path, "r") as f:
-        content = f.read()
-    
-    # Check if already patched
-    if "m4_ifndef" in content and "LT_SYS_SYMBOL_USCORE" in content:
-        print("Already patched")
-        return 0
-    
-    # Find AC_INIT and insert after it
-    pattern = r'(AC_INIT\([^)]+\))'
-    replacement = r'\1\n\n# Workaround for autoconf 2.71+: define LT_SYS_SYMBOL_USCORE\nm4_ifndef([LT_SYS_SYMBOL_USCORE], [m4_define([LT_SYS_SYMBOL_USCORE], [m4_if([$host_os], [cygwin* | mingw* | pw32* | os2*], [1], [0])])])'
-    
-    new_content = re.sub(pattern, replacement, content, count=1)
-    
-    with open(configure_ac_path, "w") as f:
-        f.write(new_content)
-    
-    print("Patched libffi configure.ac")
-    return 0
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        sys.exit(patch_libffi(sys.argv[1]))
-    else:
-        sys.exit(patch_libffi("configure.ac"))
-EOFPY
-        chmod +x /tmp/patch_libffi.py
-        
-        # Create a function to patch libffi when found
+        # Function to patch libffi
         patch_libffi() {
           local libffi_dir=$(find ~/.buildozer -type d -name "libffi" -path "*/build/other_builds/*" | head -1)
           if [ -n "$libffi_dir" ] && [ -f "$libffi_dir/configure.ac" ]; then
-            echo "Patching libffi at: $libffi_dir"
-            cd "$libffi_dir"
-            if ! grep -q "m4_ifndef.*LT_SYS_SYMBOL_USCORE" configure.ac; then
-              python3 /tmp/patch_libffi.py configure.ac
+            if ! grep -q "m4_ifndef.*LT_SYS_SYMBOL_USCORE" "$libffi_dir/configure.ac"; then
+              echo "Patching libffi at: $libffi_dir"
+              sed -i '/^AC_INIT/a\
+        # Workaround for autoconf 2.71+: define LT_SYS_SYMBOL_USCORE\nm4_ifndef([LT_SYS_SYMBOL_USCORE], [m4_define([LT_SYS_SYMBOL_USCORE], [m4_if([$host_os], [cygwin* | mingw* | pw32* | os2*], [1], [0])])])' "$libffi_dir/configure.ac"
               echo "libffi patched"
-            else
-              echo "libffi already patched"
             fi
             return 0
           fi
           return 1
         }
         
-        # Try building first
-        echo "Starting buildozer build..."
-        yes | buildozer android debug 2>&1 | tee /tmp/build.log &
-        BUILD_PID=$!
-        
-        # Monitor for libffi and patch it when found
-        MAX_WAIT=300
-        ELAPSED=0
-        PATCHED=0
-        
-        while kill -0 $BUILD_PID 2>/dev/null && [ $ELAPSED -lt $MAX_WAIT ]; do
-          if patch_libffi; then
-            PATCHED=1
-            echo "libffi patched successfully"
-            break
-          fi
-          sleep 2
-          ELAPSED=$((ELAPSED + 2))
-        done
-        
-        # Wait for build
-        wait $BUILD_PID
-        BUILD_EXIT=$?
-        
-        # If failed and not patched, patch and retry
-        if [ $BUILD_EXIT -ne 0 ] && [ $PATCHED -eq 0 ]; then
+        # Build with retry on failure
+        if ! yes | buildozer android debug; then
           echo "Build failed, patching libffi and retrying..."
           patch_libffi
           yes | buildozer android debug
-        elif [ $BUILD_EXIT -ne 0 ]; then
-          echo "Build failed even after patching"
-          tail -100 /tmp/build.log
-          exit 1
         fi
       env:
         P4A_RELEASE_KEYSTORE: ""
