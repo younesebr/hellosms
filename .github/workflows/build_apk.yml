@@ -33,8 +33,6 @@ jobs:
           libtool \
           pkg-config \
           zlib1g-dev \
-          libncurses-dev \
-          libncursesw-dev \
           cmake \
           libffi-dev \
           libssl-dev \
