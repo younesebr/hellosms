@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     
     steps:
     - name: Checkout code
@@ -43,15 +43,32 @@ jobs:
       run: |
         pip3 install --user buildozer cython
     
+    - name: Accept Android licenses
+      run: |
+        # Create licenses directory
+        mkdir -p ~/.android/licenses
+        # Accept all Android SDK licenses
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.android/licenses/android-sdk-license
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
+        echo "d975f751698a77b662f1254ddbeed3901e976f5a" > ~/.android/licenses/android-sdk-license
+        echo "601085b94cd77f0b54ff86406957099ebe79c4d6" > ~/.android/licenses/android-googletv-license
+        echo "33b6a2b64607f11b759f320ef9dff34ae516bf79" > ~/.android/licenses/android-sdk-arm-dbt-license
+        echo "8403addf88ab4874007e1c1e80a0025de11b6375" > ~/.android/licenses/android-sdk-license-5
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license-528af877
+    
     - name: Initialize buildozer
       run: |
         export PATH=$PATH:~/.local/bin
-        buildozer android update
+        # Accept licenses automatically during update
+        yes | buildozer android update || buildozer android update
+        # Wait a bit for SDK to be ready
+        sleep 5
     
     - name: Build APK with buildozer
       run: |
         export PATH=$PATH:~/.local/bin
-        buildozer android debug
+        # Build with automatic license acceptance
+        yes | buildozer android debug
       env:
         P4A_RELEASE_KEYSTORE: ""
         P4A_RELEASE_KEYALIAS: ""
