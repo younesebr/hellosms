@@ -113,48 +113,39 @@ jobs:
         export AUTOCONF=autoconf
         export WARNINGS=
         
-        # Create wrapper script for autoreconf that patches libffi
-        cat > /tmp/autoreconf_wrapper.sh << 'EOFWRAPPER'
-        #!/bin/bash
-        # Wrapper for autoreconf that patches libffi before running
-        ORIG_AUTORECONF=$(which autoreconf)
-        
-        # Check if we're in a libffi directory
-        if [ -f "configure.ac" ] && grep -q "AC_INIT.*libffi" configure.ac 2>/dev/null; then
-          echo "Detected libffi configure.ac, patching..."
-          # Patch configure.ac if not already patched
-          if ! grep -q "m4_ifndef.*LT_SYS_SYMBOL_USCORE" configure.ac; then
-            # Use Python for reliable text insertion
-            python3 << 'PYEOF'
+        # Create Python script to patch libffi
+        cat > /tmp/patch_libffi.py << 'EOFPY'
 import re
 import sys
 
-with open("configure.ac", "r") as f:
-    content = f.read()
+def patch_libffi(configure_ac_path):
+    with open(configure_ac_path, "r") as f:
+        content = f.read()
+    
+    # Check if already patched
+    if "m4_ifndef" in content and "LT_SYS_SYMBOL_USCORE" in content:
+        print("Already patched")
+        return 0
+    
+    # Find AC_INIT and insert after it
+    pattern = r'(AC_INIT\([^)]+\))'
+    replacement = r'\1\n\n# Workaround for autoconf 2.71+: define LT_SYS_SYMBOL_USCORE\nm4_ifndef([LT_SYS_SYMBOL_USCORE], [m4_define([LT_SYS_SYMBOL_USCORE], [m4_if([$host_os], [cygwin* | mingw* | pw32* | os2*], [1], [0])])])'
+    
+    new_content = re.sub(pattern, replacement, content, count=1)
+    
+    with open(configure_ac_path, "w") as f:
+        f.write(new_content)
+    
+    print("Patched libffi configure.ac")
+    return 0
 
-# Check if already patched
-if "m4_ifndef" in content and "LT_SYS_SYMBOL_USCORE" in content:
-    print("Already patched")
-    sys.exit(0)
-
-# Find AC_INIT and insert after it
-pattern = r'(AC_INIT\([^)]+\))'
-replacement = r'\1\n\n# Workaround for autoconf 2.71+: define LT_SYS_SYMBOL_USCORE\nm4_ifndef([LT_SYS_SYMBOL_USCORE], [m4_define([LT_SYS_SYMBOL_USCORE], [m4_if([$host_os], [cygwin* | mingw* | pw32* | os2*], [1], [0])])])'
-
-new_content = re.sub(pattern, replacement, content, count=1)
-
-with open("configure.ac", "w") as f:
-    f.write(new_content)
-
-print("Patched libffi configure.ac")
-PYEOF
-          fi
-        fi
-        
-        # Run original autoreconf
-        exec "$ORIG_AUTORECONF" "$@"
-        EOFWRAPPER
-        chmod +x /tmp/autoreconf_wrapper.sh
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        sys.exit(patch_libffi(sys.argv[1]))
+    else:
+        sys.exit(patch_libffi("configure.ac"))
+EOFPY
+        chmod +x /tmp/patch_libffi.py
         
         # Create a function to patch libffi when found
         patch_libffi() {
@@ -163,26 +154,7 @@ PYEOF
             echo "Patching libffi at: $libffi_dir"
             cd "$libffi_dir"
             if ! grep -q "m4_ifndef.*LT_SYS_SYMBOL_USCORE" configure.ac; then
-              python3 << 'PYEOF'
-import re
-
-with open("configure.ac", "r") as f:
-    content = f.read()
-
-if "m4_ifndef" in content and "LT_SYS_SYMBOL_USCORE" in content:
-    print("Already patched")
-    exit(0)
-
-pattern = r'(AC_INIT\([^)]+\))'
-replacement = r'\1\n\n# Workaround for autoconf 2.71+: define LT_SYS_SYMBOL_USCORE\nm4_ifndef([LT_SYS_SYMBOL_USCORE], [m4_define([LT_SYS_SYMBOL_USCORE], [m4_if([$host_os], [cygwin* | mingw* | pw32* | os2*], [1], [0])])])'
-
-new_content = re.sub(pattern, replacement, content, count=1)
-
-with open("configure.ac", "w") as f:
-    f.write(new_content)
-
-print("Patched successfully")
-PYEOF
+              python3 /tmp/patch_libffi.py configure.ac
               echo "libffi patched"
             else
               echo "libffi already patched"
