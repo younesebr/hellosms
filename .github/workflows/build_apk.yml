@@ -14,10 +14,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
@@ -33,9 +33,9 @@ jobs:
           libtool \
           pkg-config \
           zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
+          libncurses6-dev \
+          libncursesw6-dev \
+          libtinfo6 \
           cmake \
           libffi-dev \
           libssl-dev \
@@ -66,7 +66,7 @@ jobs:
         ls -lh bin/*.apk || echo "No APK files found"
     
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: hellosms-apk-android11
         path: bin/*.apk
