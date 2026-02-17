@@ -92,9 +92,6 @@ fullscreen = 0
 # (int) سطح لاگ
 log_level = 2
 
-# (int) سطح لاگ در کنسول
-log_level = 2
-
 # (bool) نمایش خروجی کامل
 warn_on_root = 1
 
